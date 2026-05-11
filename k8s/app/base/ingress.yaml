@@ -16,7 +16,7 @@ spec:
         - memory.berget.ai
       secretName: memory-tls
   rules:
-    - host: memory.berget.cloud
+    - host: memory.berget.ai
       http:
         paths:
           - path: /
