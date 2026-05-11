@@ -29,6 +29,16 @@ spec:
               value: "3000"
             - name: SSH_PORT
               value: "2222"
+            - name: EMBEDDING_BASE_URL
+              value: "https://api.berget.ai/v1"
+            - name: EMBEDDING_MODEL
+              value: "text-embedding-3-small"
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: memory-secrets
+                  key: EMBEDDING_API_KEY
+                  optional: true
           envFrom:
             - secretRef:
                 name: memory-secrets

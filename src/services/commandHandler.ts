@@ -9,7 +9,7 @@ import {
 } from "../domain/errors";
 import { getName, resolvePath, validatePath } from "./path";
 import { SearchEngine } from "./searchEngine";
-import { createEmbedding } from "../adapters/inMemoryVectorStore";
+import { BergetAIEmbeddingAdapter } from "../adapters/bergetAIEmbedding";
 
 let eventIdCounter = 0;
 function nextEventId(): string {
@@ -76,15 +76,22 @@ export class CommandHandler {
   private searchEngine: SearchEngine;
   private vectorStore?: VectorStorePort;
   private emitEvent?: (event: MemoryEvent) => void;
+  private embeddingAdapter: BergetAIEmbeddingAdapter;
 
   constructor(
     private storage: StoragePort,
     vectorStore?: VectorStorePort,
-    emitEvent?: (event: MemoryEvent) => void
+    emitEvent?: (event: MemoryEvent) => void,
+    embeddingAdapter?: BergetAIEmbeddingAdapter
   ) {
     this.searchEngine = new SearchEngine();
     this.vectorStore = vectorStore;
     this.emitEvent = emitEvent;
+    this.embeddingAdapter = embeddingAdapter ?? new BergetAIEmbeddingAdapter({
+      apiKey: process.env.EMBEDDING_API_KEY,
+      baseUrl: process.env.EMBEDDING_BASE_URL,
+      model: process.env.EMBEDDING_MODEL,
+    });
   }
 
   private fireEvent(
@@ -411,7 +418,7 @@ export class CommandHandler {
 
     // Index in vector store if available
     if (this.vectorStore && cmd.content) {
-      const embedding = createEmbedding(cmd.content);
+      const embedding = await this.embeddingAdapter.createEmbedding(cmd.content);
       await this.vectorStore.addDocument({
         id: `${ctx.userId}:${targetPath}`,
         path: targetPath,
@@ -652,7 +659,7 @@ export class CommandHandler {
 
     const query = (cmd as unknown as { query: string }).query ?? "";
     const limit = (cmd as unknown as { limit?: number }).limit ?? 10;
-    const embedding = createEmbedding(query);
+    const embedding = await this.embeddingAdapter.createEmbedding(query);
 
     const results = await this.vectorStore.search(embedding, limit);
 
@@ -680,18 +687,20 @@ export class CommandHandler {
     // Also index in vector store if available
     if (this.vectorStore) {
       const nodes = await this.storage.searchNodes(ctx.userId, "", targetPath);
-      const docs = nodes
-        .filter((n) => n.type === "file" && n.content)
-        .map((n) => ({
-          id: `${ctx.userId}:${n.path}`,
-          path: n.path,
-          content: n.content ?? "",
-          embedding: createEmbedding(n.content ?? ""),
-          metadata: {
-            userId: ctx.userId,
-            tags: n.metadata.tags,
-          },
-        }));
+      const docs = await Promise.all(
+        nodes
+          .filter((n) => n.type === "file" && n.content)
+          .map(async (n) => ({
+            id: `${ctx.userId}:${n.path}`,
+            path: n.path,
+            content: n.content ?? "",
+            embedding: await this.embeddingAdapter.createEmbedding(n.content ?? ""),
+            metadata: {
+              userId: ctx.userId,
+              tags: n.metadata.tags,
+            },
+          }))
+      );
 
       await this.vectorStore.addDocuments(docs);
     }
