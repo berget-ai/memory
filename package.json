@@ -1,0 +1,47 @@
+{
+  "name": "@berget/memory",
+  "version": "1.0.0",
+  "description": "Agent memory storage API with SSH-simulated interface, backed by S3",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/dev.ts",
+    "dev:once": "tsx src/dev.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@koa/router": "^13.1.0",
+    "commander": "^14.0.3",
+    "jsonwebtoken": "^9.0.2",
+    "just-bash": "^3.0.0",
+    "jwks-rsa": "^3.1.0",
+    "koa": "^2.15.4",
+    "koa-bodyparser": "^4.4.1",
+    "minisearch": "^7.2.0",
+    "readline": "^1.3.0",
+    "ssh2": "^1.17.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/koa": "^2.15.0",
+    "@types/koa__router": "^12.0.4",
+    "@types/koa-bodyparser": "^4.3.12",
+    "@types/node": "^22.13.10",
+    "@types/ssh2": "^1.15.5",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
