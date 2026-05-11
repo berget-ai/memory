@@ -1,0 +1,76 @@
+# FluxCD Image Automation
+# Scans for new Docker images and updates Kustomizations automatically.
+#
+# How tagging maps to environments:
+#   main push  -> 1.2.3-rc.N  (matched by *-stage policy)
+#   release.yml -> 1.2.3      (matched by *-production policy)
+
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: memory
+  namespace: flux-system
+spec:
+  image: ghcr.io/berget/memory
+  interval: 1m
+  exclusionList:
+    - ^.*\.sig$
+    - ^.*\.att$
+    - ^sha256-.*$
+
+---
+# Stage: rolls out every main push (release candidates)
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: memory-stage
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: memory
+  policy:
+    semver:
+      range: ">=0.0.0-0"
+
+---
+# Production: only clean semver releases (cut manually via release.yml)
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: memory-production
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: memory
+  policy:
+    semver:
+      range: ">=0.0.0"
+
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageUpdateAutomation
+metadata:
+  name: memory
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: memory
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: |
+        chore: update memory images
+        {{range .Updated.Images}}{{println .}}{{end}}
+    push:
+      branch: main
+  update:
+    path: ./k8s
+    strategy: Setters
