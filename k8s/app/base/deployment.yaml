@@ -31,8 +31,6 @@ spec:
               value: "2222"
             - name: EMBEDDING_BASE_URL
               value: "https://api.berget.ai/v1"
-            - name: EMBEDDING_MODEL
-              value: "text-embedding-3-small"
             - name: EMBEDDING_API_KEY
               valueFrom:
                 secretKeyRef:
