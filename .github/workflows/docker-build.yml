@@ -103,6 +103,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/berget/memory:${{ steps.version.outputs.VERSION }}
+          tags: ghcr.io/berget-ai/memory:${{ steps.version.outputs.VERSION }}
           cache-from: type=gha,scope=memory
           cache-to: type=gha,mode=max,scope=memory

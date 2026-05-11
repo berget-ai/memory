@@ -12,7 +12,7 @@ metadata:
   name: memory
   namespace: flux-system
 spec:
-  image: ghcr.io/berget/memory
+  image: ghcr.io/berget-ai/memory
   interval: 1m
   exclusionList:
     - ^.*\.sig$

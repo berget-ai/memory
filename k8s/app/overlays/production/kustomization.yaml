@@ -11,7 +11,7 @@ patches:
   - path: ingress-patch.yaml
 
 images:
-  - name: ghcr.io/berget/memory
+  - name: ghcr.io/berget-ai/memory
     newTag: 1.0.0 # {"$imagepolicy": "flux-system:memory-production:tag"}
 
 labels:
