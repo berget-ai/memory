@@ -11,3 +11,14 @@ spec:
           env:
             - name: ENVIRONMENT
               value: "stage"
+            - name: STORAGE_TYPE
+              value: "filesystem"
+            - name: STORAGE_PATH
+              value: "/data/memory"
+          volumeMounts:
+            - name: memory-data
+              mountPath: /data/memory
+      volumes:
+        - name: memory-data
+          persistentVolumeClaim:
+            claimName: pvc-memory-data
