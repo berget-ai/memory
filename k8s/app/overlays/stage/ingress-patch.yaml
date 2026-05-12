@@ -6,7 +6,7 @@ spec:
   tls:
     - hosts:
         - memory.stage.berget.ai
-      secretName: memory-stage-tls
+      secretName: memory-tls
   rules:
     - host: memory.stage.berget.ai
       http:
