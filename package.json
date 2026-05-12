@@ -1,6 +1,6 @@
 {
   "name": "@berget/memory",
-  "version": "1.0.1-rc.4",
+  "version": "1.0.1-rc.5",
   "description": "Agent memory storage API with SSH-simulated interface, backed by S3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
