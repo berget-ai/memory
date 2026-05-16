@@ -5,6 +5,7 @@ namespace: memory
 
 resources:
   - namespace.yaml
+  - pvc.yaml
   - ../../base
 
 patches:
