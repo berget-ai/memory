@@ -74,7 +74,6 @@ export function createSSHServer(config: SSHConfig): Server {
   const generatedKeysDir = join(process.cwd(), "data", "ssh-keys");
   const generatedKeyPath = join(generatedKeysDir, "ssh_host_rsa_key");
   
-  let hostKeyPath = mountedKeyPath;
   let hostKey: Buffer;
 
   if (existsSync(mountedKeyPath)) {
