@@ -69,24 +69,34 @@ function generatePrompt(session: SessionState): string {
 }
 
 export function createSSHServer(config: SSHConfig): Server {
-  const sshKeysDir = join(process.cwd(), "ssh-keys");
-  const hostKeyPath = join(sshKeysDir, "ssh_host_rsa_key");
+  // Try mounted secret first, fallback to writable directory
+  const mountedKeyPath = join(process.cwd(), "ssh-keys", "ssh_host_ed25519_key");
+  const generatedKeysDir = join(process.cwd(), "data", "ssh-keys");
+  const generatedKeyPath = join(generatedKeysDir, "ssh_host_rsa_key");
+  
+  let hostKeyPath = mountedKeyPath;
+  let hostKey: Buffer;
 
-  if (!existsSync(hostKeyPath)) {
+  if (existsSync(mountedKeyPath)) {
+    console.log("[SSH] Using mounted host key");
+    hostKey = readFileSync(mountedKeyPath);
+  } else if (existsSync(generatedKeyPath)) {
+    console.log("[SSH] Using generated host key");
+    hostKey = readFileSync(generatedKeyPath);
+  } else {
     console.log("[SSH] Generating host key...");
-    if (!existsSync(sshKeysDir)) {
-      mkdirSync(sshKeysDir, { recursive: true });
+    if (!existsSync(generatedKeysDir)) {
+      mkdirSync(generatedKeysDir, { recursive: true });
     }
     const { privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
       publicKeyEncoding: { type: "pkcs1", format: "pem" },
       privateKeyEncoding: { type: "pkcs1", format: "pem" },
     });
-    writeFileSync(hostKeyPath, privateKey, { mode: 0o600 });
+    writeFileSync(generatedKeyPath, privateKey, { mode: 0o600 });
+    hostKey = Buffer.from(privateKey);
     console.log("[SSH] Host key generated");
   }
-
-  const hostKey = readFileSync(hostKeyPath);
 
   const server = new Server(
     {
