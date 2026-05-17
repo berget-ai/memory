@@ -39,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 USER nodejs
 
 # Start both API and SSH servers
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]

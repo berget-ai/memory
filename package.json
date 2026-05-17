@@ -8,7 +8,7 @@
     "build": "tsc",
     "dev": "tsx watch src/dev.ts",
     "dev:once": "tsx src/dev.ts",
-    "start": "node dist/index.js",
+    "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
