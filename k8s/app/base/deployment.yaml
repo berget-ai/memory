@@ -14,6 +14,8 @@ spec:
       labels:
         app: memory
     spec:
+      securityContext:
+        fsGroup: 1001
       containers:
         - name: memory
           image: ghcr.io/berget-ai/memory:1.0.0
@@ -67,6 +69,6 @@ spec:
         - name: ssh-host-key
           secret:
             secretName: memory-ssh-host-key
-            defaultMode: 0600
+            defaultMode: 0640
       imagePullSecrets:
         - name: regcred
