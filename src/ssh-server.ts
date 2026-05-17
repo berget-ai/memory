@@ -1,5 +1,5 @@
 import { Server } from "ssh2";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { generateKeyPairSync } from "crypto";
 
@@ -69,10 +69,14 @@ function generatePrompt(session: SessionState): string {
 }
 
 export function createSSHServer(config: SSHConfig): Server {
-  const hostKeyPath = join(process.cwd(), "ssh_host_rsa_key");
+  const sshKeysDir = join(process.cwd(), "ssh-keys");
+  const hostKeyPath = join(sshKeysDir, "ssh_host_rsa_key");
 
   if (!existsSync(hostKeyPath)) {
     console.log("[SSH] Generating host key...");
+    if (!existsSync(sshKeysDir)) {
+      mkdirSync(sshKeysDir, { recursive: true });
+    }
     const { privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
       publicKeyEncoding: { type: "pkcs1", format: "pem" },
