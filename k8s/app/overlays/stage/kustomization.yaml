@@ -15,7 +15,7 @@ patches:
 
 images:
   - name: ghcr.io/berget-ai/memory
-    newTag: 1.0.1-rc.5 # {"$imagepolicy": "flux-system:memory-stage:tag"}
+    newTag: 1.0.1-rc.6 # {"$imagepolicy": "flux-system:memory-stage:tag"}
 
 labels:
   - pairs:
