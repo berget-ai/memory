@@ -42,12 +42,109 @@ curl -X POST http://localhost:3456/memory/exec \
 # Write content
 curl -X POST http://localhost:3456/memory/exec \
   -H "Content-Type: application/json" \
-  -d '{"command": "write /projects/myapp/README.md \"# My Project\"", "path": "/"}'
+  -d '{"command": "write /projects/myapp/README.md "# My Project"", "path": "/"}'
 
 # Read content
 curl -X POST http://localhost:3456/memory/exec \
   -H "Content-Type: application/json" \
   -d '{"command": "cat /projects/myapp/README.md", "path": "/"}'
+```
+
+## For AI Agents (No MCP Required)
+
+Your AI can use **Berget Memory** as persistent storage without any additional tools or MCP servers. Just use standard SSH or HTTP calls.
+
+### Option 1: SSH (Recommended)
+
+Connect once, keep the session open. The server gives you an interactive shell.
+
+```bash
+# Connect to your memory palace
+ssh ssh.memory.stage.berget.ai
+
+# Inside the SSH session, use these commands:
+mkdir /projects/myapp                    # Create project directory
+write /projects/myapp/spec.md "# Spec"   # Store requirements
+cat /projects/myapp/spec.md              # Read them back
+grep "TODO" /projects -r                 # Search for TODOs
+tree /projects -L2                       # View structure
+```
+
+**For autonomous agents:** Execute commands directly:
+```bash
+ssh ssh.memory.stage.berget.ai "mkdir /conversations/client-acme"
+ssh ssh.memory.stage.berget.ai "write /conversations/client-acme/2024-01-15.md 'Meeting notes...'"
+ssh ssh.memory.stage.berget.ai "cat /conversations/client-acme/2024-01-15.md"
+```
+
+### Option 2: HTTP API
+
+Use standard HTTP POST requests. No special libraries needed.
+
+```bash
+# Store a memory
+curl -X POST https://memory.stage.berget.ai/memory/exec \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "command": "write /projects/myapp/decision.md '# We chose PostgreSQL'",
+    "path": "/"
+  }'
+
+# Retrieve it
+curl -X POST https://memory.stage.berget.ai/memory/exec \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "command": "cat /projects/myapp/decision.md",
+    "path": "/"
+  }'
+
+# Batch operations (multiple commands in one request)
+curl -X POST https://memory.stage.berget.ai/memory/batch \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "commands": [
+      "mkdir /projects/myapp",
+      "cd /projects/myapp",
+      "write README.md '# My Project'",
+      "write todo.md '## Tasks\n- [ ] Setup CI'",
+      "ls -l"
+    ],
+    "path": "/"
+  }'
+```
+
+### Suggested Structure for Agents
+
+```
+/conversations/        # One directory per conversation thread
+/projects/             # One directory per project
+  /myapp/
+    README.md          # Project overview
+    decisions.md       # Architecture decisions
+    context.md         # Current session context
+    todo.md            # Active tasks
+/knowledge/            # Research, patterns, references
+/tasks/                # Global task list
+/people/               # Contacts, preferences
+```
+
+### Key Commands for Agents
+
+```bash
+# Start every session by reading context
+context=$(ssh ssh.memory.stage.berget.ai "cat /projects/myapp/context.md")
+
+# After each interaction, update context
+ssh ssh.memory.stage.berget.ai "write /projects/myapp/context.md 'Last action: ...'"
+
+# Search for relevant memories
+ssh ssh.memory.stage.berget.ai "grep 'database' /projects -r"
+
+# Use tags for organization
+ssh ssh.memory.stage.berget.ai "tag /projects/myapp/decision.md backend urgent"
 ```
 
 ## API
