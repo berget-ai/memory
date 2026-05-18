@@ -1,5 +1,5 @@
-import "./ssh-server";
 import { main } from "./index";
+import "./ssh-server";
 
 main().catch((err) => {
   console.error("Failed to start server:", err);

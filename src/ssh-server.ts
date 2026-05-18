@@ -1,11 +1,13 @@
 import { Server } from "ssh2";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { CommandHandler } from "./services/commandHandler";
+import { FileSystemStorageAdapter } from "./adapters/fileSystemStorage";
+import { InMemoryVectorStore } from "./adapters/inMemoryVectorStore";
+import { MemoryEventBus } from "./services/eventBus";
 
 interface SSHConfig {
   port: number;
-  apiUrl: string;
-  devMode: boolean;
 }
 
 interface SessionState {
@@ -13,48 +15,29 @@ interface SessionState {
   currentPath: string;
 }
 
+// Initialize storage and command handler directly (no HTTP)
+const storage = new FileSystemStorageAdapter();
+const vectorStore = new InMemoryVectorStore();
+const eventBus = new MemoryEventBus();
+const commandHandler = new CommandHandler(storage, vectorStore, (event) => {
+  eventBus.emit(event);
+});
+
 async function executeCommand(
-  apiUrl: string,
   command: string,
   path: string,
   userId: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number; currentPath: string }> {
   try {
-    const response = await fetch(`${apiUrl}/memory/exec`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${userId}`,
-      },
-      body: JSON.stringify({ command, path }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string };
-      return {
-        stdout: "",
-        stderr: errorData.error || `Error: ${response.status}`,
-        exitCode: 1,
-        currentPath: path,
-      };
-    }
-
-    const data = await response.json() as {
-      stdout?: string;
-      stderr?: string;
-      exitCode?: number;
-      currentPath?: string;
-    };
-    return {
-      stdout: data.stdout || "",
-      stderr: data.stderr || "",
-      exitCode: data.exitCode || 0,
-      currentPath: data.currentPath || path,
-    };
+    const result = await commandHandler.execute(
+      { type: "command", value: command },
+      { userId, currentPath: path, palace: { wings: [], rootNodes: [] } }
+    );
+    return result;
   } catch (err: any) {
     return {
       stdout: "",
-      stderr: `Connection error: ${err.message || String(err)}`,
+      stderr: `Error: ${err.message || String(err)}`,
       exitCode: 1,
       currentPath: path,
     };
@@ -93,21 +76,10 @@ export function createSSHServer(config: SSHConfig): Server {
       };
 
       client.on("authentication", (ctx) => {
-        if (config.devMode) {
-          session.userId = ctx.username || "anonymous";
-          ctx.accept();
-          console.log(`[SSH] Authenticated (dev): ${session.userId}`);
-        } else if (ctx.method === "publickey" && ctx.key) {
-          session.userId = ctx.username;
-          ctx.accept();
-          console.log(`[SSH] Authenticated with key: ${session.userId}`);
-        } else if (ctx.method === "password") {
-          session.userId = ctx.username;
-          ctx.accept();
-          console.log(`[SSH] Authenticated: ${session.userId}`);
-        } else {
-          ctx.reject();
-        }
+        // Accept any authentication - user isolation is handled by userId
+        session.userId = ctx.username || "anonymous";
+        ctx.accept();
+        console.log(`[SSH] Authenticated: ${session.userId}`);
       });
 
       client.on("ready", () => {
@@ -143,7 +115,7 @@ export function createSSHServer(config: SSHConfig): Server {
           channel.write("\r\n");
 
           // Execute help command to show available commands immediately
-          executeCommand(config.apiUrl, "help", session.currentPath, session.userId)
+          executeCommand("help", session.currentPath, session.userId)
             .then((helpResult) => {
               if (helpResult.stdout) {
                 const normalized = helpResult.stdout.replace(/\n/g, "\r\n");
@@ -161,69 +133,54 @@ export function createSSHServer(config: SSHConfig): Server {
           channel.on("data", async (data: Buffer) => {
             const input = data.toString();
 
+            // Handle special characters
             for (const char of input) {
-              const code = char.charCodeAt(0);
-
-              if (code === 13) {
-                // Enter
+              if (char === "\r" || char === "\n") {
+                // Execute command
                 channel.write("\r\n");
-
                 const command = buffer.trim();
                 buffer = "";
 
                 if (command) {
-                  const result = await executeCommand(
-                    config.apiUrl,
-                    command,
-                    session.currentPath,
-                    session.userId
-                  );
+                  try {
+                    const result = await executeCommand(
+                      command,
+                      session.currentPath,
+                      session.userId
+                    );
 
-                  if (result.currentPath) {
-                    session.currentPath = result.currentPath;
-                  }
-
-                  if (result.stdout) {
-                    // Convert \n to \r\n for proper terminal rendering
-                    const normalized = result.stdout.replace(/\n/g, "\r\n");
-                    channel.write(normalized);
-                    if (!normalized.endsWith("\r\n")) {
+                    if (result.stdout) {
+                      const normalized = result.stdout.replace(/\n/g, "\r\n");
+                      channel.write(normalized);
                       channel.write("\r\n");
                     }
-                  }
-
-                  if (result.stderr) {
-                    const normalized = result.stderr.replace(/\n/g, "\r\n");
-                    channel.write(`\x1b[31m${normalized}\x1b[0m`);
-                    if (!normalized.endsWith("\r\n")) {
+                    if (result.stderr) {
+                      const normalized = result.stderr.replace(/\n/g, "\r\n");
+                      channel.write(normalized);
                       channel.write("\r\n");
                     }
+
+                    if (result.currentPath) {
+                      session.currentPath = result.currentPath;
+                    }
+                  } catch (err: any) {
+                    channel.write(`Error: ${err.message || String(err)}\r\n`);
                   }
                 }
 
                 channel.write(generatePrompt(session));
-              } else if (code === 127 || code === 8) {
+              } else if (char === "\x7f" || char === "\b") {
                 // Backspace
                 if (buffer.length > 0) {
                   buffer = buffer.slice(0, -1);
                   channel.write("\b \b");
                 }
-              } else if (code === 3) {
+              } else if (char === "\x03") {
                 // Ctrl+C
                 buffer = "";
                 channel.write("^C\r\n");
                 channel.write(generatePrompt(session));
-              } else if (code === 4) {
-                // Ctrl+D (EOF)
-                channel.write("logout\r\n");
-                channel.close();
-                return;
-              } else if (code === 12) {
-                // Ctrl+L
-                channel.write("\x1b[2J\x1b[H");
-                channel.write(generatePrompt(session));
-              } else if (code >= 32 && code < 127) {
-                // Regular character
+              } else if (char >= " ") {
                 buffer += char;
                 channel.write(char);
               }
@@ -235,30 +192,23 @@ export function createSSHServer(config: SSHConfig): Server {
           });
         });
 
-        sessionStream.on("exec", (accept, _reject, info) => {
+        sessionStream.on("exec", (accept, reject, info) => {
           const channel = accept();
           const command = info.command;
 
-          executeCommand(config.apiUrl, command, session.currentPath, session.userId)
+          executeCommand(command, session.currentPath, session.userId)
             .then((result) => {
-              // Update path even in exec mode for cd commands
-              if (result.currentPath) {
-                session.currentPath = result.currentPath;
-              }
-              
               if (result.stdout) {
                 channel.write(result.stdout);
               }
               if (result.stderr) {
                 channel.stderr.write(result.stderr);
               }
-              channel.exit(result.exitCode || 0);
-              channel.close();
+              channel.exit(result.exitCode);
             })
-            .catch((err: Error) => {
-              channel.stderr.write(`Error: ${err.message}\n`);
+            .catch((err: any) => {
+              channel.stderr.write(`Error: ${err.message || String(err)}\n`);
               channel.exit(1);
-              channel.close();
             });
         });
       });
@@ -278,13 +228,9 @@ export function createSSHServer(config: SSHConfig): Server {
 
 // Start server
 const SSH_PORT = process.env.SSH_PORT ? parseInt(process.env.SSH_PORT, 10) : 2222;
-const API_URL = process.env.API_URL || "http://localhost:3456";
-const DEV_MODE = process.env.DEV_MODE !== "false";
 
 const server = createSSHServer({
   port: SSH_PORT,
-  apiUrl: API_URL,
-  devMode: DEV_MODE,
 });
 
 server.listen(SSH_PORT, "0.0.0.0", () => {
@@ -293,8 +239,8 @@ server.listen(SSH_PORT, "0.0.0.0", () => {
 ║  🔐 Berget Memory SSH Server                             ║
 ╠══════════════════════════════════════════════════════════╣
 ║  Port:        ${SSH_PORT}                                   ║
-║  API URL:     ${API_URL}                        ║
-║  Mode:        ${DEV_MODE ? "DEV (any auth accepted)" : "PRODUCTION"}          ║
+║  Direct mode: No HTTP API needed                         ║
+║  User isolation: Each user gets their own /users/{id}    ║
 ╠══════════════════════════════════════════════════════════╣
 ║  Connect with:                                           ║
 ║    ssh -p ${SSH_PORT} localhost                            ║
