@@ -14,6 +14,7 @@ export type Command =
   | { type: "tag"; path: string; tags: string[]; remove?: boolean }
   | { type: "search"; query: string; path?: string; limit?: number }
   | { type: "vsearch"; query: string; path?: string; limit?: number }
+  | { type: "context"; queries: string[]; path?: string; limit?: number; maxTokens?: number }
   | { type: "index"; path?: string }
   | { type: "stats" }
   | { type: "help" };
@@ -34,6 +35,7 @@ export const VALID_COMMANDS = [
   "tag",
   "search",
   "vsearch",
+  "context",
   "index",
   "stats",
   "help",

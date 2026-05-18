@@ -173,6 +173,21 @@ function parseSingleCommand(tokens: string[]): Command {
       };
     }
 
+    case "context": {
+      if (!args[0]) throw new InvalidCommandError("context requires at least one query");
+      const queries = args[0].split("|").map(q => q.trim()).filter(Boolean);
+      if (queries.length === 0) throw new InvalidCommandError("context requires at least one query");
+      const climitFlag = flags.find((f) => f.startsWith("-n"));
+      const tokenFlag = flags.find((f) => f.startsWith("-t"));
+      return {
+        type: "context",
+        queries,
+        path: args[1],
+        limit: climitFlag ? parseInt(climitFlag.slice(2), 10) : 10,
+        maxTokens: tokenFlag ? parseInt(tokenFlag.slice(2), 10) : 4000,
+      };
+    }
+
     case "vsearch": {
       if (!args[0]) throw new InvalidCommandError("vsearch requires a query");
       const vlimitFlag = flags.find((f) => f.startsWith("-n"));

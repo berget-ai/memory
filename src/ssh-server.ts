@@ -5,10 +5,7 @@ import { CommandHandler } from "./services/commandHandler";
 import { FileSystemStorageAdapter } from "./adapters/fileSystemStorage";
 import { InMemoryVectorStore } from "./adapters/inMemoryVectorStore";
 import { MemoryEventBus } from "./services/eventBus";
-
-interface SSHConfig {
-  port: number;
-}
+import { parseCommand } from "./services/commandParser";
 
 interface SessionState {
   userId: string;
@@ -29,8 +26,9 @@ async function executeCommand(
   userId: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number; currentPath: string }> {
   try {
+    const parsed = parseCommand(command);
     const result = await commandHandler.execute(
-      { type: "command", value: command },
+      parsed,
       { userId, currentPath: path, palace: { wings: [], rootNodes: [] } }
     );
     return result;
@@ -50,7 +48,7 @@ function generatePrompt(session: SessionState): string {
   return `${session.userId}@memory:${displayPath}$ `;
 }
 
-export function createSSHServer(config: SSHConfig): Server {
+export function createSSHServer(_port: number): Server {
   const hostKeyPath = join(process.cwd(), "ssh-keys", "ssh_host_ed25519_key");
 
   if (!existsSync(hostKeyPath)) {
@@ -192,7 +190,7 @@ export function createSSHServer(config: SSHConfig): Server {
           });
         });
 
-        sessionStream.on("exec", (accept, reject, info) => {
+        sessionStream.on("exec", (accept, _reject, info) => {
           const channel = accept();
           const command = info.command;
 
@@ -229,9 +227,7 @@ export function createSSHServer(config: SSHConfig): Server {
 // Start server
 const SSH_PORT = process.env.SSH_PORT ? parseInt(process.env.SSH_PORT, 10) : 2222;
 
-const server = createSSHServer({
-  port: SSH_PORT,
-});
+const server = createSSHServer(SSH_PORT);
 
 server.listen(SSH_PORT, "0.0.0.0", () => {
   console.log(`

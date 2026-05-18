@@ -148,6 +148,8 @@ export class CommandHandler {
         return this.handleSearch(command, context);
       case "vsearch":
         return this.handleVSearch(command as unknown as Extract<Command, { type: "search" }> & { type: "vsearch" }, context);
+      case "context":
+        return this.handleContext(command, context);
       case "index":
         return this.handleIndex(command, context);
       case "stats":
@@ -671,6 +673,71 @@ export class CommandHandler {
       stdout: output,
       stderr: "",
       exitCode: results.length === 0 ? 1 : 0,
+      currentPath: ctx.currentPath,
+    };
+  }
+
+  private async handleContext(
+    cmd: Extract<Command, { type: "context" }>,
+    ctx: SessionContext
+  ): Promise<CommandResult> {
+    const searchPath = cmd.path ? resolvePath(ctx.currentPath, cmd.path) : ctx.currentPath;
+    validatePath(searchPath);
+
+    const nodes = await this.storage.searchNodes(ctx.userId, "", searchPath);
+    const files = nodes.filter((n) => n.type === "file");
+
+    for (const node of files) {
+      this.searchEngine.indexNode(node);
+    }
+
+    // Collect results from each query with BM25 scores
+    const resultMap = new Map<string, { path: string; score: number; match: string }>();
+
+    for (const query of cmd.queries) {
+      const results = this.searchEngine.search(query, cmd.limit ?? 10);
+      for (const r of results) {
+        const existing = resultMap.get(r.path);
+        if (existing) {
+          // Combine scores: more matches = higher relevance
+          existing.score = existing.score + r.score;
+        } else {
+          resultMap.set(r.path, { ...r });
+        }
+      }
+    }
+
+    // Sort by combined score (higher = more relevant)
+    const rankedResults = Array.from(resultMap.values()).sort((a, b) => b.score - a.score);
+
+    const maxTokens = cmd.maxTokens ?? 4000;
+    let tokenCount = 0;
+    const outputParts: string[] = [];
+
+    for (const result of rankedResults) {
+      // Fetch full content
+      const node = await this.storage.getNode(ctx.userId, result.path);
+      if (!node || node.type !== "file" || node.content === undefined) continue;
+
+      const content = node.content;
+      const header = `--- ${result.path} (relevance: ${Math.min(100, Math.round(result.score * 10))}%) ---`;
+      const section = `${header}\n${content}`;
+      const sectionTokens = section.length / 4; // rough estimate: ~4 chars per token
+
+      if (tokenCount + sectionTokens > maxTokens && outputParts.length > 0) {
+        break;
+      }
+
+      outputParts.push(section);
+      tokenCount += sectionTokens;
+    }
+
+    const output = outputParts.join("\n\n");
+
+    return {
+      stdout: output || "No results found",
+      stderr: "",
+      exitCode: output ? 0 : 1,
       currentPath: ctx.currentPath,
     };
   }
