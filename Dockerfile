@@ -25,7 +25,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
-# Generate SSH host key if not mounted
+# Ensure ssh-keys mount point exists with correct ownership
 RUN mkdir -p /app/ssh-keys && \
     chown nodejs:nodejs /app/ssh-keys
 
