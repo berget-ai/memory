@@ -25,9 +25,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
-# Create writable directories
-RUN mkdir -p /app/ssh-keys /app/data/ssh-keys && \
-    chown -R nodejs:nodejs /app/ssh-keys /app/data
+# Ensure ssh-keys mount point exists with correct ownership
+RUN mkdir -p /app/ssh-keys && \
+    chown nodejs:nodejs /app/ssh-keys
 
 # Expose ports
 EXPOSE 3000 2222
