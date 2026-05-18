@@ -1,7 +1,6 @@
 import { Server } from "ssh2";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { generateKeyPairSync } from "crypto";
 
 interface SSHConfig {
   port: number;
